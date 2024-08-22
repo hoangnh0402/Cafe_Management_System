@@ -1,0 +1,156 @@
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package controller;
+
+import contant.AccountContant;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.util.List;
+import javax.swing.JOptionPane;
+import javax.swing.JTable;
+import javax.swing.table.TableModel;
+import model.Category;
+import model.Product;
+import repository.CategoryRepositoryImpl;
+import repository.ProductRepositoryImpl;
+import service.CategoryServiceImpl;
+import service.IService.ICategoryService;
+import service.IService.IProductService;
+import service.ProductServiceImpl;
+import view.AddNewProduct;
+import view.Home;
+import view.ViewEditDeleteProduct;
+
+/**
+ *
+ * @author PC
+ */
+public class ProductController {
+    private final IProductService productService = new ProductServiceImpl(new ProductRepositoryImpl());
+    private final ICategoryService categoryService = new CategoryServiceImpl(new CategoryRepositoryImpl());
+    private AddNewProduct newProductView;
+    private ViewEditDeleteProduct editAndDeleteProductView;
+    private List<Category> categories = categoryService.getAllCategoryRecords();
+
+    public ProductController(AddNewProduct newProductView) {
+        this.newProductView = newProductView;
+        categories.forEach(cate -> newProductView.getCcb().addItem(cate.getName()));
+        //Lắng nghe sự kiện thêm sản phẩm
+        this.newProductView.addExitListener(new ReturnHomeListener());
+        this.newProductView.addSaveProduct(new SaveProductListener());
+    }
+
+    public ProductController(ViewEditDeleteProduct editAndDeleteProductView) {
+        this.editAndDeleteProductView = editAndDeleteProductView;
+        categories.forEach(cate -> editAndDeleteProductView.getCategory().addItem(cate.getName()));
+        //Lắng nghe các sự kiện như sửa xóa sản phẩm
+        this.editAndDeleteProductView.reloadTable(productService.getAllRecords());
+        this.editAndDeleteProductView.addExitListener(new ReturnHomeListener());
+        this.editAndDeleteProductView.addUpdatedListener(new UpdatedProductListener());
+        this.editAndDeleteProductView.addDeleteListener(new DeleteProductListener());
+        this.editAndDeleteProductView.addMouseClickerListner(new MouseClickTableListener());
+    }
+
+    void showViewEditProduct() {
+        this.editAndDeleteProductView.setVisible(true);
+    }
+
+    void showAddNewProductView() {
+        this.newProductView.setVisible(true);
+    }
+
+    private class MouseClickTableListener extends MouseAdapter {
+
+        @Override
+        public void mouseClicked(MouseEvent e) {
+            JTable jTable = editAndDeleteProductView.getProTable();
+            int index = jTable.getSelectedRow();
+            if (index != -1) {
+                TableModel model = jTable.getModel();
+                String id = model.getValueAt(index, 0).toString();
+                editAndDeleteProductView.getLblId().setText(id);
+                String name = model.getValueAt(index, 1).toString();
+                editAndDeleteProductView.getTxtName().setText(name);
+                String category = model.getValueAt(index, 2).toString();
+                String price = model.getValueAt(index, 3).toString();
+                editAndDeleteProductView.getTxtPrice().setText(price);
+                editAndDeleteProductView.getBtnUpdate().setEnabled(true);
+                editAndDeleteProductView.getBtnDelete().setEnabled(true);
+                editAndDeleteProductView.getCategory().removeAllItems();
+                editAndDeleteProductView.getCategory().addItem(category);
+                for (Category category1 : categories) {
+                    if (!category1.getName().equals(category)) {
+                        editAndDeleteProductView.getCategory().addItem(category1.getName());
+                    }
+                }
+            }
+        }
+    }
+
+    private class DeleteProductListener implements ActionListener {
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            Integer id = editAndDeleteProductView.getId();
+            //Gửi thông báo đến Client có muốn thực hiện xóa sản phẩm không?
+            int a = JOptionPane.showConfirmDialog(null, "Do you want to delete this product", "Select", JOptionPane.YES_NO_OPTION);
+            if (a == 0) {
+                //Nếu đồng ý thì thực hiện xóa và tải lại bảng
+                productService.deleteById(id);
+                editAndDeleteProductView.reloadTable(productService.getAllRecords());
+                editAndDeleteProductView.clear();
+            }
+        }
+    }
+
+    private class UpdatedProductListener implements ActionListener {
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            Integer id = editAndDeleteProductView.getId();
+            String name = editAndDeleteProductView.getNameProduct();
+            String category = editAndDeleteProductView.getStringCategory();
+            String price = editAndDeleteProductView.getPrice();
+            Product product = new Product(id, name, category, price);
+            //Lấy ra các thông tin cần sửa của sản phẩm thực hiện cập nhật và tải lại bảng
+            productService.updateProduct(product);
+            editAndDeleteProductView.reloadTable(productService.getAllRecords());
+        }
+    }
+
+    private class SaveProductListener implements ActionListener {
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            //Lấy ra các thông tin cần thiết của sản phẩm và lưu trữ
+            Product product = new Product(
+                    newProductView.getName(),
+                    newProductView.getSelectedItem(),
+                    newProductView.getPrice()
+            );
+
+            productService.saveProduct(product);
+            newProductView.clear();
+        }
+    }
+
+    private class ReturnHomeListener implements ActionListener {
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            if (newProductView != null) {
+                newProductView.setVisible(false);
+            }
+            if (editAndDeleteProductView != null) {
+                editAndDeleteProductView.setVisible(false);
+            }
+            Home homeView = new Home();
+            HomeController homeController = new HomeController(AccountContant.ADMIN, homeView);
+            homeController.showHomeView();
+        }
+    }
+}
